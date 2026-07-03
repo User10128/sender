@@ -3,22 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remote Monitor & Control</title>
+    <title>Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link rel="icon" href="/favicon.png">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+
+        /* Load Google Sans from gstatic, fallback to Outfit */
+        @font-face {
+            font-family: 'Google Sans';
+            src: local('Google Sans'), local('Product Sans'),
+                 url('https://fonts.gstatic.com/s/productsans/v5/HYvgU2fE2nRJvZ5JFAumwegdm0LZdjqr5-oayXSOefg.woff2') format('woff2');
+        }
+
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #111827;
+            background-color: #000;
+            background-image: url('https://photographylife.com/wp-content/uploads/2016/06/Mass.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             color: white;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Google Sans', 'Outfit', system-ui, -apple-system, sans-serif;
             overflow: hidden;
         }
 
-        /* Receiver Media Container */
+        /* --- Glassmorphism Utilities --- */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-button {
+            background: rgba(37, 99, 235, 0.65); /* Blue */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            color: white;
+            cursor: pointer;
+        }
+
+        .glass-button:hover {
+            background: rgba(59, 130, 246, 0.85);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .glass-input:focus {
+            outline: none;
+            border-color: rgba(96, 165, 250, 0.8);
+            background: rgba(0, 0, 0, 0.6);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        /* --- Layout & Media Styles --- */
         #media-container {
             display: none;
             width: 100vw;
@@ -31,21 +88,25 @@
         .media-element {
             width: 100%;
             height: auto;
-            display: none; /* Hidden by default */
+            display: none;
             pointer-events: auto;
         }
 
-        /* Special styling for text files to look like a document */
         #remote-text, #local-text-preview {
             width: 100%;
             min-height: 100vh;
-            background-color: white;
-            color: black;
-            padding: 2rem;
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #111827;
+            padding: 3rem;
             box-sizing: border-box;
             font-family: monospace;
             white-space: pre-wrap;
             text-align: left;
+        }
+
+        #local-text-preview {
+            min-height: 50vh;
+            border-radius: 12px;
         }
 
         .hide-cursor {
@@ -69,12 +130,11 @@
             100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
         }
 
-        /* Desktop Sender Embedded Browser */
         #sender-browser-area {
             display: none;
             width: 100vw;
             height: 100vh;
-            background-color: #f3f4f6;
+            background-color: transparent;
             flex-direction: column;
         }
 
@@ -85,12 +145,11 @@
             background-color: white;
         }
         
-        /* Mobile Sender File Presenter */
         #mobile-presenter-area {
             display: none;
             width: 100vw;
             height: 100vh;
-            background-color: #1f2937;
+            background-color: transparent;
             flex-direction: column;
         }
     </style>
@@ -100,81 +159,91 @@
     <!-- Main Setup UI -->
     <div id="setup-ui" class="relative flex flex-col items-center justify-center w-full h-full p-6">
         
-        <button onclick="requestFullscreen(document.documentElement); this.remove();" class="absolute top-4 right-4 w-32 h-10 shrink-0 bg-gray-800 hover:bg-gray-700 text-sm font-semibold rounded-lg transition-colors shadow flex items-center justify-center z-50">
+        <button onclick="requestFullscreen(document.documentElement); this.remove();" class="absolute top-6 right-6 w-36 h-12 shrink-0 glass-button text-sm font-semibold rounded-xl flex items-center justify-center z-50">
             <svg class="w-5 h-5 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
             Fullscreen
         </button>
 
-        <h1 class="text-4xl font-bold mb-8 tracking-tight text-white">Remote Link</h1>
-        
-        <div id="role-selection" class="flex space-x-4">
-            <button onclick="setRole('sender')" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors shadow-lg">
-                I am the Sender
-            </button>
-            <button onclick="setRole('receiver')" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors shadow-lg">
-                I am the Receiver
-            </button>
-        </div>
+        <!-- Glass Container for UI -->
+        <div class="glass-panel p-10 md:p-16 rounded-3xl flex flex-col items-center w-full max-w-2xl text-center">
+            
+            <h1 class="text-5xl font-bold mb-10 tracking-tight text-white drop-shadow-md">Remote Link</h1>
+            
+            <div id="role-selection" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6 w-full justify-center">
+                <button onclick="setRole('sender')" class="px-8 py-4 glass-button rounded-xl font-semibold text-lg w-full sm:w-auto">
+                    I am the Sender
+                </button>
+                <button onclick="setRole('receiver')" class="px-8 py-4 glass-button rounded-xl font-semibold text-lg w-full sm:w-auto">
+                    I am the Receiver
+                </button>
+            </div>
 
-        <div id="sender-ui" class="hidden flex-col items-center">
-            <p class="text-gray-400 mb-2">Your 4-Digit Code</p>
-            <div id="sender-code" class="text-6xl font-mono font-bold tracking-widest bg-gray-800 px-8 py-4 rounded-xl border border-gray-700 mb-4">
-                ----
+            <!-- Sender UI -->
+            <div id="sender-ui" class="hidden flex-col items-center w-full">
+                <p class="text-blue-100 mb-3 font-medium">Your 4-Digit Code</p>
+                <div id="sender-code" class="text-7xl font-mono font-bold tracking-widest glass-input px-10 py-6 rounded-2xl mb-6 shadow-inner">
+                    ----
+                </div>
+                
+                <div class="mb-6 px-6 py-4 bg-blue-900/30 rounded-xl border border-blue-400/30 text-center max-w-md">
+                    <span class="text-sm text-blue-100 leading-relaxed">Mode: <strong>Smart Sender</strong>. We will try to share your screen. If on mobile, we will automatically open the File Presenter mode!</span>
+                </div>
+
+                <p class="text-sm text-blue-200 flex items-center font-medium">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Waiting for receiver to connect...
+                </p>
+            </div>
+
+            <!-- Receiver UI -->
+            <div id="receiver-ui" class="hidden flex-col items-center w-full max-w-sm">
+                <p class="text-blue-100 mb-3 font-medium">Enter the Sender's Code</p>
+                <input type="text" id="join-code" maxlength="4" placeholder="0000" class="w-full text-center text-6xl font-mono font-bold glass-input rounded-2xl py-5 mb-6 uppercase tracking-widest placeholder-white/30">
+                <button onclick="connectToSender()" id="connect-btn" class="w-full px-8 py-4 glass-button rounded-xl font-bold text-xl">
+                    Connect
+                </button>
+                <p id="receiver-status" class="mt-5 text-blue-200 text-sm hidden font-medium"></p>
             </div>
             
-            <div class="mb-4 px-4 py-3 bg-blue-900/40 rounded-lg border border-blue-800 text-center max-w-sm shadow-lg">
-                <span class="text-sm text-blue-200">Mode: <strong>Smart Sender</strong>. We will try to share your screen. If on mobile, we will automatically open the File Presenter mode!</span>
-            </div>
-
-            <p class="text-sm text-gray-400 flex items-center">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Waiting for receiver to connect...
-            </p>
-        </div>
-
-        <div id="receiver-ui" class="hidden flex-col items-center w-full max-w-xs">
-            <p class="text-gray-400 mb-2 text-center">Enter the Sender's Code</p>
-            <input type="text" id="join-code" maxlength="4" placeholder="0000" class="w-full text-center text-5xl font-mono font-bold bg-gray-800 border-2 border-gray-600 rounded-xl py-4 mb-4 focus:outline-none focus:border-emerald-500 transition-colors uppercase">
-            <button onclick="connectToSender()" id="connect-btn" class="w-full px-6 py-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold text-xl transition-colors shadow-lg">
-                Connect
-            </button>
-            <p id="receiver-status" class="mt-4 text-gray-400 text-sm hidden"></p>
         </div>
     </div>
 
     <!-- 1. Desktop Sender (Browser Embed) -->
     <div id="sender-browser-area">
-        <div class="h-14 bg-gray-800 flex items-center px-4 shadow-md w-full shrink-0">
+        <div class="h-20 glass-panel border-x-0 border-t-0 flex items-center px-6 shadow-md w-full shrink-0">
             <div class="flex space-x-2 mr-6">
-                <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-red-400/90 shadow-sm"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-yellow-400/90 shadow-sm"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-green-400/90 shadow-sm"></div>
             </div>
-            <div class="flex-1 flex items-center bg-gray-900 rounded-full px-4 py-1.5 border border-gray-700">
-                <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                <input type="text" id="browser-url" value="https://en.wikipedia.org/wiki/Chromebook" class="bg-transparent text-gray-200 text-sm focus:outline-none w-full" onkeydown="if(event.key === 'Enter') loadUrl()">
+            <div class="flex-1 flex items-center glass-input rounded-full px-5 py-2.5">
+                <svg class="w-5 h-5 text-white/60 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" id="browser-url" value="https://en.wikipedia.org/wiki/Chromebook" class="bg-transparent text-white font-medium focus:outline-none w-full" onkeydown="if(event.key === 'Enter') loadUrl()">
             </div>
-            <button onclick="loadUrl()" class="ml-4 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow">Load URL</button>
+            <button onclick="loadUrl()" class="ml-4 px-6 py-2.5 glass-button font-medium rounded-xl">Load URL</button>
         </div>
         <iframe id="inner-iframe" src="https://en.wikipedia.org/wiki/Chromebook"></iframe>
     </div>
 
     <!-- 2. Mobile Sender (File Presenter Mode) -->
     <div id="mobile-presenter-area">
-        <div class="h-16 bg-gray-800 flex items-center justify-between px-4 shadow-md shrink-0 border-b border-gray-700">
-            <span class="text-white font-semibold">Mobile Presenter</span>
-            <label class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg cursor-pointer transition-colors shadow">
+        <div class="h-20 glass-panel border-x-0 border-t-0 flex items-center justify-between px-6 shadow-md w-full shrink-0">
+            <span class="text-white text-lg font-bold tracking-wide">Mobile Presenter</span>
+            <label class="px-6 py-2.5 glass-button text-white text-sm font-bold rounded-xl flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                 Open File
                 <input type="file" id="file-input" class="hidden" accept="image/*,video/*,text/plain">
             </label>
         </div>
-        <div class="flex-grow overflow-auto p-4 flex flex-col items-center">
-            <p id="local-preview-placeholder" class="text-gray-400 text-center mt-10">Select an Image, Video, or Text file.<br>It will be beamed to the receiver's screen.</p>
+        <div class="flex-grow overflow-auto p-6 flex flex-col items-center justify-center">
+            <div id="local-preview-placeholder" class="glass-panel p-8 rounded-2xl text-center max-w-sm">
+                <p class="text-blue-100 font-medium">Select an Image, Video, or Text file.<br><br>It will be beamed directly to the receiver's screen.</p>
+            </div>
             
-            <!-- Local previews so the sender sees what they are sharing -->
-            <img id="local-image" class="media-element rounded shadow-lg max-w-full">
-            <video id="local-video" class="media-element rounded shadow-lg max-w-full" controls autoplay playsinline loop></video>
-            <div id="local-text-preview" class="media-element rounded shadow-lg mt-4 w-full" style="min-height: 50vh;"></div>
+            <!-- Local previews -->
+            <img id="local-image" class="media-element rounded-xl shadow-2xl max-w-full">
+            <video id="local-video" class="media-element rounded-xl shadow-2xl max-w-full" controls autoplay playsinline loop></video>
+            <div id="local-text-preview" class="media-element shadow-2xl mt-4 w-full"></div>
         </div>
     </div>
 
@@ -236,9 +305,6 @@
             }
         }
 
-        // ==========================================
-        // SENDER LOGIC
-        // ==========================================
         function initSender() {
             const code = Math.floor(1000 + Math.random() * 9000).toString();
             peer = new Peer(code);
@@ -264,8 +330,6 @@
 
         async function startScreenShareAndCall(receiverId) {
             try {
-                // Try to share the screen first (Works on Desktop)
-                // Now includes audio: true to capture system/tab sounds!
                 mediaStream = await navigator.mediaDevices.getDisplayMedia({ 
                     video: { cursor: "always" }, 
                     audio: true 
@@ -280,33 +344,29 @@
                 };
 
             } catch (err) {
-                // 🚀 MOBILE FALLBACK: File Presenter Mode
+                // Mobile Fallback: File Presenter
                 const notification = document.createElement('div');
-                notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-yellow-900 px-6 py-3 rounded-lg shadow-xl z-50 text-sm font-bold text-center w-11/12 max-w-sm';
+                notification.className = 'fixed top-6 left-1/2 transform -translate-x-1/2 glass-panel border border-blue-300 text-white px-8 py-4 rounded-xl shadow-2xl z-50 text-sm font-bold text-center w-11/12 max-w-sm backdrop-blur-md';
                 notification.innerText = 'Mobile Mode Activated: You can now open files to project them to the receiver.';
                 document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 5000);
+                setTimeout(() => notification.remove(), 6000);
 
                 setupUI.style.display = 'none';
                 mobilePresenterArea.style.display = 'flex';
 
-                // Tell receiver to enter Mobile File mode (since there is no video call coming)
                 dataConnection.send({ type: 'start-mobile-mode' });
             }
         }
 
-        // Handle File Selection on Sender side
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Display locally on the sender's screen
             displayFileLocally(file);
 
-            // Send the actual file object over WebRTC to the receiver
             dataConnection.send({
                 type: 'file',
-                file: file, // PeerJS safely serializes the File object!
+                file: file,
                 fileType: file.type
             });
         });
@@ -363,9 +423,6 @@
             }
         }
 
-        // ==========================================
-        // RECEIVER LOGIC
-        // ==========================================
         function connectToSender() {
             const targetId = joinCodeInput.value.trim();
             if (targetId.length !== 4) return showStatus("Please enter a valid 4-digit code.");
@@ -383,14 +440,10 @@
                     showStatus("Connected! Waiting for sender...");
                 });
 
-                // Listen for clicks AND Files
                 dataConnection.on('data', (data) => {
-                    // Start mobile mode (no video stream coming)
                     if (data.type === 'start-mobile-mode') {
                         activateReceiverUI();
-                    } 
-                    // Handle incoming beamed file
-                    else if (data.type === 'file') {
+                    } else if (data.type === 'file') {
                         handleReceivedFile(data.file, data.fileType);
                     }
                 });
@@ -398,10 +451,10 @@
                 dataConnection.on('error', () => {
                     showStatus("Data connection failed.");
                     connectBtn.disabled = false;
+                    connectBtn.innerText = "Connect";
                 });
             });
 
-            // Desktop Mode (Receives live video stream)
             peer.on('call', (call) => {
                 call.answer(); 
                 
@@ -439,7 +492,6 @@
         function handleReceivedFile(fileData, mimeType) {
             hideAllReceiverMedia();
             
-            // Reconstruct the file object from the binary data
             const blob = new Blob([fileData], { type: mimeType });
             const url = URL.createObjectURL(blob);
 
@@ -460,7 +512,6 @@
             }
         }
 
-        // Attach click listener to all media elements so it works in any mode
         const mediaElements = [remoteVideo, remoteImage, remoteFileVideo, remoteText];
         mediaElements.forEach(el => {
             el.addEventListener('click', (e) => {
