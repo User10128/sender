@@ -265,9 +265,10 @@
         async function startScreenShareAndCall(receiverId) {
             try {
                 // Try to share the screen first (Works on Desktop)
+                // Now includes audio: true to capture system/tab sounds!
                 mediaStream = await navigator.mediaDevices.getDisplayMedia({ 
                     video: { cursor: "always" }, 
-                    audio: false 
+                    audio: true 
                 });
                 
                 const call = peer.call(receiverId, mediaStream);
