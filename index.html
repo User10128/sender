@@ -12,35 +12,46 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #111827; /* gray-900 */
+            background-color: #111827;
             color: white;
             font-family: system-ui, -apple-system, sans-serif;
             overflow: hidden;
         }
 
-        /* Receiver Video Styling */
-        #video-container {
+        /* Receiver Media Container */
+        #media-container {
             display: none;
             width: 100vw;
             height: 100vh;
             background-color: black;
-            overflow-y: auto; /* Allows scrolling down if the video is taller than the screen */
+            overflow-y: auto;
             overflow-x: hidden;
         }
 
-        #remote-video {
-            width: 100%; /* Forces the video to take the whole screen width */
-            height: auto; /* Scales proportionally, pushing excess height to the bottom */
-            display: block;
+        .media-element {
+            width: 100%;
+            height: auto;
+            display: none; /* Hidden by default */
             pointer-events: auto;
         }
 
-        /* Hide cursor for the receiver */
-        .hide-cursor {
-            cursor: none !important;
+        /* Special styling for text files to look like a document */
+        #remote-text, #local-text-preview {
+            width: 100%;
+            min-height: 100vh;
+            background-color: white;
+            color: black;
+            padding: 2rem;
+            box-sizing: border-box;
+            font-family: monospace;
+            white-space: pre-wrap;
+            text-align: left;
         }
 
-        /* Visual Ripple for simulated clicks */
+        .hide-cursor {
+            cursor: none;
+        }
+
         .ripple {
             position: absolute;
             width: 20px;
@@ -58,7 +69,7 @@
             100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
         }
 
-        /* Sender Embedded Browser */
+        /* Desktop Sender Embedded Browser */
         #sender-browser-area {
             display: none;
             width: 100vw;
@@ -73,6 +84,15 @@
             border: none;
             background-color: white;
         }
+        
+        /* Mobile Sender File Presenter */
+        #mobile-presenter-area {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            background-color: #1f2937;
+            flex-direction: column;
+        }
     </style>
 </head>
 <body>
@@ -80,7 +100,6 @@
     <!-- Main Setup UI -->
     <div id="setup-ui" class="relative flex flex-col items-center justify-center w-full h-full p-6">
         
-        <!-- Fullscreen Button -->
         <button onclick="requestFullscreen(document.documentElement); this.remove();" class="absolute top-4 right-4 w-32 h-10 shrink-0 bg-gray-800 hover:bg-gray-700 text-sm font-semibold rounded-lg transition-colors shadow flex items-center justify-center z-50">
             <svg class="w-5 h-5 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
             Fullscreen
@@ -97,7 +116,6 @@
             </button>
         </div>
 
-        <!-- Sender UI -->
         <div id="sender-ui" class="hidden flex-col items-center">
             <p class="text-gray-400 mb-2">Your 4-Digit Code</p>
             <div id="sender-code" class="text-6xl font-mono font-bold tracking-widest bg-gray-800 px-8 py-4 rounded-xl border border-gray-700 mb-4">
@@ -105,7 +123,7 @@
             </div>
             
             <div class="mb-4 px-4 py-3 bg-blue-900/40 rounded-lg border border-blue-800 text-center max-w-sm shadow-lg">
-                <span class="text-sm text-blue-200">Mode: <strong>Embedded Browser</strong>. Once connected, we will launch a simulated browser tab that you can share with the receiver!</span>
+                <span class="text-sm text-blue-200">Mode: <strong>Smart Sender</strong>. We will try to share your screen. If on mobile, we will automatically open the File Presenter mode!</span>
             </div>
 
             <p class="text-sm text-gray-400 flex items-center">
@@ -114,7 +132,6 @@
             </p>
         </div>
 
-        <!-- Receiver UI -->
         <div id="receiver-ui" class="hidden flex-col items-center w-full max-w-xs">
             <p class="text-gray-400 mb-2 text-center">Enter the Sender's Code</p>
             <input type="text" id="join-code" maxlength="4" placeholder="0000" class="w-full text-center text-5xl font-mono font-bold bg-gray-800 border-2 border-gray-600 rounded-xl py-4 mb-4 focus:outline-none focus:border-emerald-500 transition-colors uppercase">
@@ -125,9 +142,8 @@
         </div>
     </div>
 
-    <!-- Sender Embedded Browser Area -->
+    <!-- 1. Desktop Sender (Browser Embed) -->
     <div id="sender-browser-area">
-        <!-- Browser Toolbar -->
         <div class="h-14 bg-gray-800 flex items-center px-4 shadow-md w-full shrink-0">
             <div class="flex space-x-2 mr-6">
                 <div class="w-3 h-3 rounded-full bg-red-500"></div>
@@ -140,16 +156,36 @@
             </div>
             <button onclick="loadUrl()" class="ml-4 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow">Load URL</button>
         </div>
-        
-        <div class="bg-yellow-200 text-yellow-900 text-xs px-4 py-1.5 text-center font-medium shrink-0">
-            Note: For clicks to pass through perfectly, try browsing websites that allow embedding (like Wikipedia). Due to browser security, cross-origin sites might block simulated clicks.
-        </div>
         <iframe id="inner-iframe" src="https://en.wikipedia.org/wiki/Chromebook"></iframe>
     </div>
 
-    <!-- Receiver Video Container -->
-    <div id="video-container">
-        <video id="remote-video" autoplay playsinline></video>
+    <!-- 2. Mobile Sender (File Presenter Mode) -->
+    <div id="mobile-presenter-area">
+        <div class="h-16 bg-gray-800 flex items-center justify-between px-4 shadow-md shrink-0 border-b border-gray-700">
+            <span class="text-white font-semibold">Mobile Presenter</span>
+            <label class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg cursor-pointer transition-colors shadow">
+                Open File
+                <input type="file" id="file-input" class="hidden" accept="image/*,video/*,text/plain">
+            </label>
+        </div>
+        <div class="flex-grow overflow-auto p-4 flex flex-col items-center">
+            <p id="local-preview-placeholder" class="text-gray-400 text-center mt-10">Select an Image, Video, or Text file.<br>It will be beamed to the receiver's screen.</p>
+            
+            <!-- Local previews so the sender sees what they are sharing -->
+            <img id="local-image" class="media-element rounded shadow-lg max-w-full">
+            <video id="local-video" class="media-element rounded shadow-lg max-w-full" controls autoplay playsinline loop></video>
+            <div id="local-text-preview" class="media-element rounded shadow-lg mt-4 w-full" style="min-height: 50vh;"></div>
+        </div>
+    </div>
+
+    <!-- 3. Receiver Container (Can show Video stream, Image file, or Text file) -->
+    <div id="media-container">
+        <!-- Live screen share video feed -->
+        <video id="remote-video" class="media-element" autoplay playsinline></video>
+        <!-- Beamed files -->
+        <img id="remote-image" class="media-element">
+        <video id="remote-file-video" class="media-element" autoplay playsinline loop></video>
+        <div id="remote-text" class="media-element"></div>
     </div>
 
     <script>
@@ -165,9 +201,15 @@
         const joinCodeInput = document.getElementById('join-code');
         const receiverStatus = document.getElementById('receiver-status');
         
-        const videoContainer = document.getElementById('video-container');
+        const mediaContainer = document.getElementById('media-container');
         const remoteVideo = document.getElementById('remote-video');
+        const remoteImage = document.getElementById('remote-image');
+        const remoteFileVideo = document.getElementById('remote-file-video');
+        const remoteText = document.getElementById('remote-text');
+        
         const senderBrowserArea = document.getElementById('sender-browser-area');
+        const mobilePresenterArea = document.getElementById('mobile-presenter-area');
+        const fileInput = document.getElementById('file-input');
         
         function loadUrl() {
             let url = document.getElementById('browser-url').value;
@@ -222,27 +264,81 @@
 
         async function startScreenShareAndCall(receiverId) {
             try {
+                // Try to share the screen first (Works on Desktop)
                 mediaStream = await navigator.mediaDevices.getDisplayMedia({ 
                     video: { cursor: "always" }, 
                     audio: false 
                 });
-
+                
                 const call = peer.call(receiverId, mediaStream);
                 setupUI.style.display = 'none';
                 senderBrowserArea.style.display = 'flex';
 
                 mediaStream.getVideoTracks()[0].onended = () => {
-                    alert("Screen sharing ended. Refresh to start a new session.");
                     window.location.reload();
                 };
+
             } catch (err) {
-                alert("Failed to share screen. Connection aborted.");
-                window.location.reload();
+                // 🚀 MOBILE FALLBACK: File Presenter Mode
+                const notification = document.createElement('div');
+                notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-yellow-900 px-6 py-3 rounded-lg shadow-xl z-50 text-sm font-bold text-center w-11/12 max-w-sm';
+                notification.innerText = 'Mobile Mode Activated: You can now open files to project them to the receiver.';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 5000);
+
+                setupUI.style.display = 'none';
+                mobilePresenterArea.style.display = 'flex';
+
+                // Tell receiver to enter Mobile File mode (since there is no video call coming)
+                dataConnection.send({ type: 'start-mobile-mode' });
+            }
+        }
+
+        // Handle File Selection on Sender side
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Display locally on the sender's screen
+            displayFileLocally(file);
+
+            // Send the actual file object over WebRTC to the receiver
+            dataConnection.send({
+                type: 'file',
+                file: file, // PeerJS safely serializes the File object!
+                fileType: file.type
+            });
+        });
+
+        function displayFileLocally(file) {
+            document.getElementById('local-preview-placeholder').style.display = 'none';
+            const localImg = document.getElementById('local-image');
+            const localVid = document.getElementById('local-video');
+            const localTxt = document.getElementById('local-text-preview');
+
+            localImg.style.display = 'none';
+            localVid.style.display = 'none';
+            localTxt.style.display = 'none';
+
+            const url = URL.createObjectURL(file);
+
+            if (file.type.startsWith('image/')) {
+                localImg.src = url;
+                localImg.style.display = 'block';
+            } else if (file.type.startsWith('video/')) {
+                localVid.src = url;
+                localVid.style.display = 'block';
+            } else if (file.type.startsWith('text/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    localTxt.innerText = e.target.result;
+                    localTxt.style.display = 'block';
+                };
+                reader.readAsText(file);
             }
         }
 
         function processReceivedClick(percentX, percentY) {
-            // Map percentages back to the Sender's window dimensions
             const clientX = percentX * window.innerWidth;
             const clientY = percentY * window.innerHeight;
 
@@ -281,57 +377,104 @@
 
             peer.on('open', () => {
                 dataConnection = peer.connect(targetId);
+                
+                dataConnection.on('open', () => {
+                    showStatus("Connected! Waiting for sender...");
+                });
+
+                // Listen for clicks AND Files
+                dataConnection.on('data', (data) => {
+                    // Start mobile mode (no video stream coming)
+                    if (data.type === 'start-mobile-mode') {
+                        activateReceiverUI();
+                    } 
+                    // Handle incoming beamed file
+                    else if (data.type === 'file') {
+                        handleReceivedFile(data.file, data.fileType);
+                    }
+                });
+
                 dataConnection.on('error', () => {
                     showStatus("Data connection failed.");
                     connectBtn.disabled = false;
                 });
             });
 
+            // Desktop Mode (Receives live video stream)
             peer.on('call', (call) => {
                 call.answer(); 
                 
                 call.on('stream', (remoteStream) => {
-                    setupUI.style.display = 'none';
-                    videoContainer.style.display = 'block'; // Ensure it is a block container for scrolling
+                    activateReceiverUI();
+                    hideAllReceiverMedia();
                     remoteVideo.srcObject = remoteStream;
-                    
-                    document.body.classList.add('hide-cursor');
-                    
-                    // Enforce Fullscreen on interaction
-                    const enforceFullscreen = () => {
-                        if (!document.fullscreenElement) {
-                            requestFullscreen(document.documentElement);
-                        }
-                    };
-                    
-                    enforceFullscreen(); // Try immediately
-                    
-                    // Keep enforcing it whenever the receiver touches/clicks the screen
-                    document.body.addEventListener('click', enforceFullscreen);
-                    document.body.addEventListener('touchstart', enforceFullscreen);
+                    remoteVideo.style.display = 'block';
                 });
             });
         }
 
-        // Send clicks accurately regardless of scrolling
-        remoteVideo.addEventListener('click', (e) => {
-            if (!dataConnection || !dataConnection.open) return;
-
-            // Get exact bounding rect of the video, accounting for scroll offset
-            const rect = remoteVideo.getBoundingClientRect();
+        function activateReceiverUI() {
+            setupUI.style.display = 'none';
+            mediaContainer.style.display = 'block';
+            document.body.classList.add('hide-cursor');
             
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top; // Safely accounts for negative top when scrolled
+            const enforceFullscreen = () => {
+                if (!document.fullscreenElement) {
+                    requestFullscreen(document.documentElement);
+                }
+            };
+            enforceFullscreen();
+            document.body.addEventListener('click', enforceFullscreen);
+            document.body.addEventListener('touchstart', enforceFullscreen);
+        }
 
-            // Ensure the click was actually on the video
-            if (clickX >= 0 && clickX <= rect.width && clickY >= 0 && clickY <= rect.height) {
-                
-                // Calculate percentage relative to the fully rendered video
-                const percentX = clickX / rect.width;
-                const percentY = clickY / rect.height;
+        function hideAllReceiverMedia() {
+            remoteVideo.style.display = 'none';
+            remoteImage.style.display = 'none';
+            remoteFileVideo.style.display = 'none';
+            remoteText.style.display = 'none';
+        }
 
-                dataConnection.send({ type: 'click', x: percentX, y: percentY });
+        function handleReceivedFile(fileData, mimeType) {
+            hideAllReceiverMedia();
+            
+            // Reconstruct the file object from the binary data
+            const blob = new Blob([fileData], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+
+            if (mimeType.startsWith('image/')) {
+                remoteImage.src = url;
+                remoteImage.style.display = 'block';
+            } else if (mimeType.startsWith('video/')) {
+                remoteFileVideo.src = url;
+                remoteFileVideo.style.display = 'block';
+                remoteFileVideo.play();
+            } else if (mimeType.startsWith('text/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    remoteText.innerText = e.target.result;
+                    remoteText.style.display = 'block';
+                };
+                reader.readAsText(blob);
             }
+        }
+
+        // Attach click listener to all media elements so it works in any mode
+        const mediaElements = [remoteVideo, remoteImage, remoteFileVideo, remoteText];
+        mediaElements.forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (!dataConnection || !dataConnection.open) return;
+
+                const rect = el.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                if (clickX >= 0 && clickX <= rect.width && clickY >= 0 && clickY <= rect.height) {
+                    const percentX = clickX / rect.width;
+                    const percentY = clickY / rect.height;
+                    dataConnection.send({ type: 'click', x: percentX, y: percentY });
+                }
+            });
         });
 
         function requestFullscreen(element) {
