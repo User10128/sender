@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Monitor & Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #111827; /* gray-900 */
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Receiver Video Styling */
+        #video-container {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            background-color: black;
+            overflow-y: auto; /* Allows scrolling down if the video is taller than the screen */
+            overflow-x: hidden;
+        }
+
+        #remote-video {
+            width: 100%; /* Forces the video to take the whole screen width */
+            height: auto; /* Scales proportionally, pushing excess height to the bottom */
+            display: block;
+            pointer-events: auto;
+        }
+
+        /* Hide cursor for the receiver */
+        .hide-cursor {
+            cursor: none !important;
+        }
+
+        /* Visual Ripple for simulated clicks */
+        .ripple {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 0, 0, 0.7);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(1);
+            animation: ripple-anim 0.5s ease-out forwards;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        @keyframes ripple-anim {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
+        }
+
+        /* Sender Embedded Browser */
+        #sender-browser-area {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            background-color: #f3f4f6;
+            flex-direction: column;
+        }
+
+        #inner-iframe {
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Setup UI -->
+    <div id="setup-ui" class="flex flex-col items-center justify-center w-full h-full p-6">
+        <h1 class="text-4xl font-bold mb-8 tracking-tight text-white">Remote Link</h1>
+        
+        <div id="role-selection" class="flex space-x-4">
+            <button onclick="setRole('sender')" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors shadow-lg">
+                I am the Sender
+            </button>
+            <button onclick="setRole('receiver')" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-semibold transition-colors shadow-lg">
+                I am the Receiver
+            </button>
+        </div>
+
+        <!-- Sender UI -->
+        <div id="sender-ui" class="hidden flex-col items-center">
+            <p class="text-gray-400 mb-2">Your 4-Digit Code</p>
+            <div id="sender-code" class="text-6xl font-mono font-bold tracking-widest bg-gray-800 px-8 py-4 rounded-xl border border-gray-700 mb-4">
+                ----
+            </div>
+            
+            <div class="mb-4 px-4 py-3 bg-blue-900/40 rounded-lg border border-blue-800 text-center max-w-sm shadow-lg">
+                <span class="text-sm text-blue-200">Mode: <strong>Embedded Browser</strong>. Once connected, we will launch a simulated browser tab that you can share with the receiver!</span>
+            </div>
+
+            <p class="text-sm text-gray-400 flex items-center">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Waiting for receiver to connect...
+            </p>
+        </div>
+
+        <!-- Receiver UI -->
+        <div id="receiver-ui" class="hidden flex-col items-center w-full max-w-xs">
+            <p class="text-gray-400 mb-2 text-center">Enter the Sender's Code</p>
+            <input type="text" id="join-code" maxlength="4" placeholder="0000" class="w-full text-center text-5xl font-mono font-bold bg-gray-800 border-2 border-gray-600 rounded-xl py-4 mb-4 focus:outline-none focus:border-emerald-500 transition-colors uppercase">
+            <button onclick="connectToSender()" id="connect-btn" class="w-full px-6 py-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold text-xl transition-colors shadow-lg">
+                Connect
+            </button>
+            <p id="receiver-status" class="mt-4 text-gray-400 text-sm hidden"></p>
+        </div>
+    </div>
+
+    <!-- Sender Embedded Browser Area -->
+    <div id="sender-browser-area">
+        <!-- Browser Toolbar -->
+        <div class="h-14 bg-gray-800 flex items-center px-4 shadow-md w-full shrink-0">
+            <div class="flex space-x-2 mr-6">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <div class="flex-1 flex items-center bg-gray-900 rounded-full px-4 py-1.5 border border-gray-700">
+                <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" id="browser-url" value="https://en.wikipedia.org/wiki/Chromebook" class="bg-transparent text-gray-200 text-sm focus:outline-none w-full" onkeydown="if(event.key === 'Enter') loadUrl()">
+            </div>
+            <button onclick="loadUrl()" class="ml-4 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow">Load URL</button>
+        </div>
+        
+        <div class="bg-yellow-200 text-yellow-900 text-xs px-4 py-1.5 text-center font-medium shrink-0">
+            Note: For clicks to pass through perfectly, try browsing websites that allow embedding (like Wikipedia). Due to browser security, cross-origin sites might block simulated clicks.
+        </div>
+        <iframe id="inner-iframe" src="https://en.wikipedia.org/wiki/Chromebook"></iframe>
+    </div>
+
+    <!-- Receiver Video Container -->
+    <div id="video-container">
+        <video id="remote-video" autoplay playsinline></video>
+    </div>
+
+    <script>
+        let peer = null;
+        let dataConnection = null;
+        let mediaStream = null;
+
+        const setupUI = document.getElementById('setup-ui');
+        const roleSelection = document.getElementById('role-selection');
+        const senderUI = document.getElementById('sender-ui');
+        const receiverUI = document.getElementById('receiver-ui');
+        const senderCodeEl = document.getElementById('sender-code');
+        const joinCodeInput = document.getElementById('join-code');
+        const receiverStatus = document.getElementById('receiver-status');
+        
+        const videoContainer = document.getElementById('video-container');
+        const remoteVideo = document.getElementById('remote-video');
+        const senderBrowserArea = document.getElementById('sender-browser-area');
+        
+        function loadUrl() {
+            let url = document.getElementById('browser-url').value;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            document.getElementById('inner-iframe').src = url;
+        }
+
+        function showStatus(msg) {
+            receiverStatus.innerText = msg;
+            receiverStatus.classList.remove('hidden');
+        }
+
+        function setRole(role) {
+            roleSelection.classList.add('hidden');
+            
+            if (role === 'sender') {
+                initSender();
+            } else {
+                receiverUI.classList.remove('hidden');
+                receiverUI.classList.add('flex');
+                setTimeout(() => joinCodeInput.focus(), 100);
+            }
+        }
+
+        // ==========================================
+        // SENDER LOGIC
+        // ==========================================
+        function initSender() {
+            const code = Math.floor(1000 + Math.random() * 9000).toString();
+            peer = new Peer(code);
+
+            peer.on('open', (id) => {
+                senderUI.classList.remove('hidden');
+                senderUI.classList.add('flex');
+                senderCodeEl.innerText = id;
+            });
+
+            peer.on('connection', (conn) => {
+                dataConnection = conn;
+                
+                conn.on('data', (data) => {
+                    if (data.type === 'click') {
+                        processReceivedClick(data.x, data.y);
+                    }
+                });
+
+                startScreenShareAndCall(conn.peer);
+            });
+        }
+
+        async function startScreenShareAndCall(receiverId) {
+            try {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: { cursor: "always" }, 
+                    audio: false 
+                });
+
+                const call = peer.call(receiverId, mediaStream);
+                setupUI.style.display = 'none';
+                senderBrowserArea.style.display = 'flex';
+
+                mediaStream.getVideoTracks()[0].onended = () => {
+                    alert("Screen sharing ended. Refresh to start a new session.");
+                    window.location.reload();
+                };
+            } catch (err) {
+                alert("Failed to share screen. Connection aborted.");
+                window.location.reload();
+            }
+        }
+
+        function processReceivedClick(percentX, percentY) {
+            // Map percentages back to the Sender's window dimensions
+            const clientX = percentX * window.innerWidth;
+            const clientY = percentY * window.innerHeight;
+
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple';
+            ripple.style.left = `${clientX}px`;
+            ripple.style.top = `${clientY}px`;
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 500);
+
+            const element = document.elementFromPoint(clientX, clientY);
+            if (element) {
+                element.click();
+                ['mousedown', 'mouseup'].forEach(eventType => {
+                    const event = new MouseEvent(eventType, {
+                        view: window, bubbles: true, cancelable: true,
+                        clientX: clientX, clientY: clientY
+                    });
+                    element.dispatchEvent(event);
+                });
+            }
+        }
+
+        // ==========================================
+        // RECEIVER LOGIC
+        // ==========================================
+        function connectToSender() {
+            const targetId = joinCodeInput.value.trim();
+            if (targetId.length !== 4) return showStatus("Please enter a valid 4-digit code.");
+
+            const connectBtn = document.getElementById('connect-btn');
+            connectBtn.disabled = true;
+            connectBtn.innerText = "Connecting...";
+
+            peer = new Peer();
+
+            peer.on('open', () => {
+                dataConnection = peer.connect(targetId);
+                dataConnection.on('error', () => {
+                    showStatus("Data connection failed.");
+                    connectBtn.disabled = false;
+                });
+            });
+
+            peer.on('call', (call) => {
+                call.answer(); 
+                
+                call.on('stream', (remoteStream) => {
+                    setupUI.style.display = 'none';
+                    videoContainer.style.display = 'block'; // Ensure it is a block container for scrolling
+                    remoteVideo.srcObject = remoteStream;
+                    
+                    document.body.classList.add('hide-cursor');
+                    
+                    // Enforce Fullscreen on interaction
+                    const enforceFullscreen = () => {
+                        if (!document.fullscreenElement) {
+                            requestFullscreen(document.documentElement);
+                        }
+                    };
+                    
+                    enforceFullscreen(); // Try immediately
+                    
+                    // Keep enforcing it whenever the receiver touches/clicks the screen
+                    document.body.addEventListener('click', enforceFullscreen);
+                    document.body.addEventListener('touchstart', enforceFullscreen);
+                });
+            });
+        }
+
+        // Send clicks accurately regardless of scrolling
+        remoteVideo.addEventListener('click', (e) => {
+            if (!dataConnection || !dataConnection.open) return;
+
+            // Get exact bounding rect of the video, accounting for scroll offset
+            const rect = remoteVideo.getBoundingClientRect();
+            
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top; // Safely accounts for negative top when scrolled
+
+            // Ensure the click was actually on the video
+            if (clickX >= 0 && clickX <= rect.width && clickY >= 0 && clickY <= rect.height) {
+                
+                // Calculate percentage relative to the fully rendered video
+                const percentX = clickX / rect.width;
+                const percentY = clickY / rect.height;
+
+                dataConnection.send({ type: 'click', x: percentX, y: percentY });
+            }
+        });
+
+        function requestFullscreen(element) {
+            if (element.requestFullscreen) element.requestFullscreen().catch(() => {});
+            else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
+            else if (element.msRequestFullscreen) element.msRequestFullscreen();
+        }
+    </script>
+</body>
+</html>
